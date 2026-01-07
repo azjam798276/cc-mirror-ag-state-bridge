@@ -1,0 +1,57 @@
+--- baseline_adapter.md+++ optimized_adapter.md@@ -1,31 +1,32 @@ # QA Engineering: cc-mirror State Bridge Adapter
+ 
+ ## Core Mandates
+-1. **90% Coverage:** All modules must meet coverage target before merge.
+-2. **Platform Testing:** Test on Linux (primary), macOS, Windows.
+-3. **Fixture-Based:** Use mock AG session files in `tests/fixtures/`.
++1. **90% Coverage Target:** All modules in `src/providers/antigravity/state-bridge/` must maintain >90% statement and branch coverage. Verify using `npm test -- --coverage`.
++2. **Fixture Integrity:** Use and extend the fixture registry in `tests/fixtures/ag-sessions/`. Immediately create `complex-v1.json`, `large-session.json`, and `corrupted.json` to complete the test suite.
++3. **Resilient Parsing:** The adapter must never crash on malformed input. Implement and verify fallback logic to `GenericParser` for all non-standard or corrupted sessions.
+ 
+-## Test Fixtures Required
+-```
+-tests/fixtures/ag-sessions/
+-├── simple-v1.json          # Basic v1 format
+-├── complex-v1.json         # Many steps, variables
+-├── large-session.json      # >1MB for performance test
+-├── corrupted.json          # Invalid JSON
+-└── unknown-format.json     # Tests generic parser
+-```
++## Required Fixtures (`tests/fixtures/ag-sessions/`)
++- `simple-v1.json`: Basic valid v1 session.
++- `complex-v1.json`: Multi-step session containing environment variables and nested steps.
++- `large-session.json`: Stress test fixture (>1MB) to validate memory limits and parser performance.
++- `corrupted.json`: Invalid JSON structure to test error boundary handling.
++- `unknown-format.json`: Valid JSON with an unrecognized schema to test generic parsing.
+ 
+-## Critical Test Scenarios
+-| Scenario | Expected | Priority |
+-|----------|----------|----------|
+-| No sessions | Proceed without context | P0 |
+-| Parse failure | Use generic parser | P0 |
+-| OAuth expired | Trigger refresh | P0 |
+-| Context >50KB | Truncate | P1 |
++## Critical Scenarios & Expected Outcomes
++- **Scenario: Empty Session Directory** -> **Result:** Log warning; proceed with null context; ensure no crash.
++- **Scenario: Parse Error/Corruption** -> **Result:** Catch exception; fallback to `GenericParser`; continue execution.
++- **Scenario: Expired OAuth Token** -> **Result:** Detect 401 or expiration state; trigger `OAuthManager.refreshSession()`; retry.
++- **Scenario: Context Size > 50KB** -> **Result:** Apply truncation strategy (prioritize latest steps); log notice of truncation.
+ 
+-## Integration Test Flow
+-1. Create mock AG session directory
+-2. Run `cc-mirror send --continue-from-ag`
+-3. Verify context injected
+-4. Verify API request sent
+-5. Clean up
++## Integration Testing Workflow
++1. **Setup:** Programmatically create a temporary AG session directory populated with target fixtures.
++2. **Execution:** Invoke `cc-mirror send --continue-from-ag` using the project's execution pattern.
++3. **Assertion:** 
++    - Verify `ContextInjector` correctly transformed the session data into the bridge format.
++    - Verify the outgoing API request payload contains the expected context data.
++4. **Teardown:** Purge all temporary test artifacts and directories.
++
++## Technical Implementation Standards
++- **Framework:** Use `jest` with `ts-jest` for all tests.
++- **Mocking:** Mock filesystem operations (`fs`) for session discovery and network calls for API verification.
++- **Portability:** Use `path.join()` for all file paths to ensure compatibility across Linux, macOS, and Windows.

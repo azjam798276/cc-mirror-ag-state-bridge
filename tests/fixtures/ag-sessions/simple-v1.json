@@ -1,0 +1,58 @@
+{
+    "initialPrompt": "Build a REST API with user authentication",
+    "plan": [
+        {
+            "id": "step-1",
+            "description": "Design database schema",
+            "status": "completed",
+            "files": [
+                "src/db/schema.sql"
+            ],
+            "result": "Created users table with id, email, password_hash"
+        },
+        {
+            "id": "step-2",
+            "description": "Implement user model",
+            "status": "completed",
+            "files": [
+                "src/models/user.js"
+            ],
+            "result": "User model with CRUD operations"
+        },
+        {
+            "id": "step-3",
+            "description": "Create auth middleware",
+            "status": "completed",
+            "files": [
+                "src/middleware/auth.js"
+            ],
+            "result": "JWT-based authentication middleware"
+        },
+        {
+            "id": "step-4",
+            "description": "Write API routes",
+            "status": "executing",
+            "files": [],
+            "result": null
+        },
+        {
+            "id": "step-5",
+            "description": "Add tests",
+            "status": "pending",
+            "files": [],
+            "result": null
+        }
+    ],
+    "currentStepIndex": 3,
+    "state": {
+        "variables": {
+            "DB_NAME": "myapp_db",
+            "AUTH_METHOD": "JWT"
+        }
+    },
+    "terminalHistory": [
+        "npm init -y",
+        "npm install express jsonwebtoken bcrypt",
+        "mkdir -p src/models src/middleware src/db"
+    ]
+}

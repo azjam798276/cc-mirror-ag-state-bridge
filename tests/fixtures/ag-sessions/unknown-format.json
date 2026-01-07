@@ -1,0 +1,22 @@
+{
+    "unknown_field": "This is an unknown format",
+    "task": "Refactor the payment module",
+    "actions": [
+        {
+            "name": "Review existing code",
+            "done": true
+        },
+        {
+            "name": "Identify bottlenecks",
+            "done": true
+        },
+        {
+            "name": "Implement optimizations",
+            "done": false
+        }
+    ],
+    "modified": [
+        "src/payments/processor.ts",
+        "src/payments/gateway.ts"
+    ]
+}

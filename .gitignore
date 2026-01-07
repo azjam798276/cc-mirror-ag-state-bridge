@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+test-output.log
+
+# Testing & Coverage
+coverage/
+test-results.json
+.nyc_output/
+
+# Runtime Dta
+*.pid
+.orchestrator.pid
+
+# Python/Optimizer artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+optimization_results/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# IDE specific
+.vscode/
+.idea/
+.gemini/
+
+# Temporary
+tmp/
+temp/
