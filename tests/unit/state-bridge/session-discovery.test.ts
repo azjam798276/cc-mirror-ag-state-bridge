@@ -38,7 +38,10 @@ describe('SessionDiscovery', () => {
         });
 
         it('should find sessions in default path', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-abc123.json', 'session-def456.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-abc123.json', isDirectory: () => false, isFile: () => true },
+                { name: 'session-def456.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({
                 mtime: new Date('2026-01-07T08:00:00Z'),
                 size: 1024
@@ -54,7 +57,10 @@ describe('SessionDiscovery', () => {
             const oldDate = new Date('2026-01-06');
             const newDate = new Date('2026-01-07');
 
-            mockFs.readdirSync.mockReturnValue(['session-old.json', 'session-new.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-old.json', isDirectory: () => false, isFile: () => true },
+                { name: 'session-new.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation((p: any) => ({
                 mtime: p.includes('new') ? newDate : oldDate,
                 size: 100
@@ -71,7 +77,9 @@ describe('SessionDiscovery', () => {
             process.env.AG_SESSION_DIR = customPath;
 
             mockFs.existsSync.mockImplementation((p) => p === customPath);
-            mockFs.readdirSync.mockReturnValue(['session-custom.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-custom.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({ mtime: new Date(), size: 100 } as any));
 
             const sessions = await discovery.findSessions();
@@ -81,7 +89,10 @@ describe('SessionDiscovery', () => {
         });
 
         it('should skip unreadable files without error', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-good.json', 'session-bad.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-good.json', isDirectory: () => false, isFile: () => true },
+                { name: 'session-bad.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation((p: any) => {
                 if (p.includes('bad')) throw new Error('Permission denied');
                 return { mtime: new Date(), size: 100 } as any;
@@ -107,7 +118,10 @@ describe('SessionDiscovery', () => {
             const oldDate = new Date('2026-01-06');
             const newestDate = new Date('2026-01-07');
 
-            mockFs.readdirSync.mockReturnValue(['session-older.json', 'session-newest.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-older.json', isDirectory: () => false, isFile: () => true },
+                { name: 'session-newest.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation((p: any) => ({
                 mtime: p.includes('newest') ? newestDate : oldDate,
                 size: 100
@@ -121,7 +135,10 @@ describe('SessionDiscovery', () => {
 
     describe('getSessionById', () => {
         it('should return session with matching ID', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-target.json', 'session-other.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-target.json', isDirectory: () => false, isFile: () => true },
+                { name: 'session-other.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({ mtime: new Date(), size: 100 } as any));
 
             const session = await discovery.getSessionById('target');
@@ -130,7 +147,9 @@ describe('SessionDiscovery', () => {
         });
 
         it('should return null for non-existent session ID', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-other.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-other.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({ mtime: new Date(), size: 100 } as any));
 
             const session = await discovery.getSessionById('nonexistent');
@@ -141,7 +160,9 @@ describe('SessionDiscovery', () => {
 
     describe('caching', () => {
         it('should cache results for 60 seconds', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-cached.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-cached.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({ mtime: new Date(), size: 100 } as any));
 
             await discovery.findSessions();
@@ -152,7 +173,9 @@ describe('SessionDiscovery', () => {
         });
 
         it('should clear cache when clearCache is called', async () => {
-            mockFs.readdirSync.mockReturnValue(['session-cached.json'] as any);
+            mockFs.readdirSync.mockReturnValue([
+                { name: 'session-cached.json', isDirectory: () => false, isFile: () => true }
+            ] as any);
             mockFs.statSync.mockImplementation(() => ({ mtime: new Date(), size: 100 } as any));
 
             await discovery.findSessions();

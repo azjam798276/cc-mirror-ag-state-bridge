@@ -34,7 +34,7 @@ describe('SessionParser', () => {
         };
 
         it('should parse v1 format correctly', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify(v1Session));
 
             const result = await parser.parse('/path/to/session.json');
@@ -47,7 +47,7 @@ describe('SessionParser', () => {
         });
 
         it('should extract completed and pending steps', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify(v1Session));
 
             const result = await parser.parse('/path/to/session.json');
@@ -70,7 +70,7 @@ describe('SessionParser', () => {
         };
 
         it('should parse v2 format correctly', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify(v2Session));
 
             const result = await parser.parse('/path/to/session.json');
@@ -78,6 +78,66 @@ describe('SessionParser', () => {
             expect(result.goal).toBe('Fix database timeout');
             expect(result.planSteps.length).toBe(2);
             expect(result.filesModified).toContain('config.yml');
+        });
+    });
+
+    describe('parse - Brain Directory', () => {
+        const brainDir = '/home/user/.gemini/antigravity/brain/session-uuid';
+        const taskMd = `
+# Task: Optimize Database queries
+- [x] Analyze slow queries
+- [/] Add indexes
+- [ ] Deploy changes
+`;
+        const planMd = `
+# Plan
+We will modify \`src/db/repo.ts\` and \`src/index.ts\`.
+`;
+
+        it('should parse brain directory structure', async () => {
+            // Mock statSync to recognize directory
+            mockFs.statSync.mockImplementation((p: any) => {
+                if (p === brainDir) return { isDirectory: () => true } as any;
+                return { isDirectory: () => false, size: 100 } as any;
+            });
+
+            // Mock existsSync for internal checks
+            mockFs.existsSync.mockImplementation((p: any) => {
+                return p.includes('task.md') || p.includes('implementation_plan.md');
+            });
+
+            // Mock readFileSync
+            mockFs.readFileSync.mockImplementation((p: any) => {
+                if (p.includes('task.md')) return taskMd;
+                if (p.includes('implementation_plan.md')) return planMd;
+                return '';
+            });
+
+            const result = await parser.parse(brainDir);
+
+            expect(result.sessionId).toBe('session-uuid');
+            expect(result.goal).toBe('Optimize Database queries');
+            expect(result.planSteps.length).toBe(3);
+            expect(result.completedSteps[0].action).toBe('Analyze slow queries');
+            expect(result.filesModified).toContain('src/db/repo.ts');
+        });
+
+        it('should handle missing plan file', async () => {
+            // Mock statSync to recognize directory
+            mockFs.statSync.mockImplementation((p: any) => {
+                if (p === brainDir) return { isDirectory: () => true } as any;
+                return { isDirectory: () => false, size: 100 } as any;
+            });
+
+            mockFs.existsSync.mockImplementation((p: any) => p.includes('task.md')); // plan missing
+            mockFs.readFileSync.mockImplementation((p: any) => {
+                if (p.includes('task.md')) return taskMd;
+                return '';
+            });
+
+            const result = await parser.parse(brainDir);
+            expect(result.planSteps.length).toBe(3);
+            expect(result.filesModified).toEqual([]);
         });
     });
 
@@ -89,7 +149,7 @@ describe('SessionParser', () => {
         };
 
         it('should extract goal using heuristics', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify(unknownSession));
 
             const result = await parser.parse('/path/to/session.json');
@@ -98,7 +158,7 @@ describe('SessionParser', () => {
         });
 
         it('should extract files from modified field', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify(unknownSession));
 
             const result = await parser.parse('/path/to/session.json');
@@ -109,20 +169,20 @@ describe('SessionParser', () => {
 
     describe('error handling', () => {
         it('should throw SessionParseError for files > 50MB', async () => {
-            mockFs.statSync.mockReturnValue({ size: 51 * 1024 * 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 51 * 1024 * 1024, isDirectory: () => false } as any);
 
             await expect(parser.parse('/path/to/large.json')).rejects.toThrow(SessionParseError);
         });
 
         it('should throw SessionParseError for invalid JSON', async () => {
-            mockFs.statSync.mockReturnValue({ size: 1024 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue('not valid json {{{');
 
             await expect(parser.parse('/path/to/invalid.json')).rejects.toThrow(SessionParseError);
         });
 
         it('should handle empty object gracefully', async () => {
-            mockFs.statSync.mockReturnValue({ size: 2 } as any);
+            mockFs.statSync.mockReturnValue({ size: 2, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue('{}');
 
             const result = await parser.parse('/path/to/empty.json');
@@ -150,7 +210,7 @@ describe('SessionParser', () => {
 
             parser.registerFormat(customDetector);
 
-            mockFs.statSync.mockReturnValue({ size: 100 } as any);
+            mockFs.statSync.mockReturnValue({ size: 1024, isDirectory: () => false } as any);
             mockFs.readFileSync.mockReturnValue(JSON.stringify({ customField: 'Custom goal' }));
 
             const result = await parser.parse('/path/to/custom.json');

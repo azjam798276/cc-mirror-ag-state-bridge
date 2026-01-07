@@ -168,7 +168,7 @@ export class CLIDashboard {
 
         // Clear and render
         this.clearScreen();
-        this.renderHeader();
+        this.renderHeader(orchestratorState);
         this.renderAgentMatrix(this.lastStatuses);
 
         if (this.config.showDispatchQueue && orchestratorState) {
@@ -178,7 +178,7 @@ export class CLIDashboard {
         this.renderFooter();
     }
 
-    private renderHeader(): void {
+    private renderHeader(orchestratorState?: OrchestratorState | null): void {
         const now = new Date();
         const uptime = Math.floor((now.getTime() - this.startTime.getTime()) / 1000);
         const uptimeStr = this.formatDuration(uptime * 1000);
@@ -189,6 +189,14 @@ export class CLIDashboard {
         console.log('╚══════════════════════════════════════════════════════════════════════════════╝');
         console.log(colors.reset);
         console.log(`  ${colors.dim}Last refresh: ${now.toLocaleTimeString()} | Uptime: ${uptimeStr} | Refresh: ${this.config.refreshIntervalMs / 1000}s${colors.reset}`);
+
+        // Show current sprint/phase
+        if (orchestratorState?.currentPhase) {
+            const phase = orchestratorState.currentPhase.phase.replace(/-/g, ' ').toUpperCase();
+            const status = orchestratorState.currentPhase.status;
+            const statusColor = status === 'in_progress' ? colors.yellow : status === 'complete' ? colors.green : colors.cyan;
+            console.log(`  ${colors.bold}Current Phase:${colors.reset} ${statusColor}${phase}${colors.reset} ${colors.dim}(${status})${colors.reset}`);
+        }
         console.log('');
     }
 
@@ -240,6 +248,9 @@ export class CLIDashboard {
         if (status.isComplete) {
             statusText = '✅ DONE';
             statusColor = colors.green;
+        } else if (status.isActive) {
+            statusText = '🚀 RUNNING';
+            statusColor = colors.magenta;
         } else if (status.isIdle) {
             statusText = '⚠️  IDLE';
             statusColor = colors.yellow;
@@ -329,15 +340,9 @@ export class CLIDashboard {
 // ============================================================================
 
 async function main() {
-    // CC-Mirror agents
-    const agents: AgentConfig[] = [
-        { agentId: 'orchestrator', conversationId: 'e20afd38-f5dc-4f4c-aadc-a720cc401eaf', role: 'orchestrator', brainDir: '' },
-        { agentId: 'backend', conversationId: '15b9c503-6ccc-4d27-be08-680a3b9c0af2', role: 'backend-engineer', brainDir: '' },
-        { agentId: 'security', conversationId: '64a8119a-82df-466d-b1ef-6a968f8c02f2', role: 'security-engineer', brainDir: '' },
-        { agentId: 'qa', conversationId: '5858eac3-c35a-44e1-9b13-8023ddcd423d', role: 'qa-engineer', brainDir: '' },
-        { agentId: 'devops', conversationId: '91ccd3cd-586f-4f0d-b490-7fb42ceed5b2', role: 'devops-engineer', brainDir: '' },
-        { agentId: 'director', conversationId: '5c053cb6-0934-4f88-9ab9-19aebdecd1a1', role: 'engineering-director', brainDir: '' },
-    ];
+    // Import CC-Mirror agents from shared config
+    const { CC_MIRROR_AGENTS } = await import('./index');
+    const agents: AgentConfig[] = CC_MIRROR_AGENTS;
 
     const dashboard = new CLIDashboard({
         refreshIntervalMs: 5000,

@@ -22,8 +22,11 @@ export class SessionDiscovery {
             paths.push(process.env.AG_SESSION_DIR);
         }
 
-        // Default paths
+        // ACTUAL Antigravity IDE brain directories (highest priority)
         const home = os.homedir();
+        paths.push(path.join(home, '.gemini', 'antigravity', 'brain'));
+
+        // Legacy/documented paths (kept for compatibility with PRD spec)
         paths.push(path.join(home, '.antigravity', 'sessions'));
 
         // Platform-specific fallbacks
@@ -39,6 +42,7 @@ export class SessionDiscovery {
         return paths;
     }
 
+
     async findSessions(): Promise<AGSessionMetadata[]> {
         // Check cache
         if (this.cache && Date.now() - this.cacheTime < this.CACHE_TTL_MS) {
@@ -52,23 +56,42 @@ export class SessionDiscovery {
             if (!fs.existsSync(basePath)) continue;
 
             try {
-                const files = fs.readdirSync(basePath)
-                    .filter(f => f.endsWith('.json'));
+                const entries = fs.readdirSync(basePath, { withFileTypes: true });
 
-                for (const file of files) {
-                    const sessionId = this.extractSessionId(file);
-                    // Skip if we already found this session in a higher priority path
-                    if (sessionMap.has(sessionId)) continue;
+                for (const entry of entries) {
+                    const entryPath = path.join(basePath, entry.name);
 
-                    const filePath = path.join(basePath, file);
                     // Security Check: Prevent path traversal
-                    if (!SecurityUtils.isPathSafe(filePath, searchPaths)) {
-                        console.warn(`Skipping unsafe session path: ${filePath}`);
+                    if (!SecurityUtils.isPathSafe(entryPath, searchPaths)) {
+                        console.warn(`Skipping unsafe session path: ${entryPath}`);
                         continue;
                     }
 
+                    let sessionId: string;
+                    let filePath: string;
+                    let stats: fs.Stats;
+
                     try {
-                        const stats = fs.statSync(filePath);
+                        if (entry.isDirectory()) {
+                            // Antigravity brain directory - check for task.md
+                            const taskPath = path.join(entryPath, 'task.md');
+                            if (!fs.existsSync(taskPath)) continue;
+
+                            sessionId = entry.name; // UUID directory name
+                            filePath = entryPath;
+                            stats = fs.statSync(entryPath);
+                        } else if (entry.name.endsWith('.json')) {
+                            // Legacy JSON session file
+                            sessionId = this.extractSessionId(entry.name);
+                            filePath = entryPath;
+                            stats = fs.statSync(entryPath);
+                        } else {
+                            continue; // Skip other files
+                        }
+
+                        // Skip if we already found this session in a higher priority path
+                        if (sessionMap.has(sessionId)) continue;
+
                         sessionMap.set(sessionId, {
                             sessionId,
                             filePath,
@@ -77,14 +100,15 @@ export class SessionDiscovery {
                             ageString: this.formatAge(stats.mtime)
                         });
                     } catch (e) {
-                        // Skip unreadable files
-                        console.warn(`Skipping unreadable session: ${filePath}`);
+                        // Skip unreadable entries
+                        console.warn(`Skipping unreadable session: ${entryPath}`);
                     }
                 }
             } catch (e) {
                 console.error(`Failed to read directory: ${basePath}`, e);
             }
         }
+
 
         const sessions = Array.from(sessionMap.values());
 

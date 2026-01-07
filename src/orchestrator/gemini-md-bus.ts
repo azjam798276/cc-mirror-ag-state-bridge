@@ -272,30 +272,46 @@ export async function initializePhase2(): Promise<void> {
         {
             id: 'P2-002',
             agent: 'backend-engineer',
-            description: 'Implement --ag-session CLI flag',
+            description: 'Implement SessionDiscovery and recursive file search',
             status: 'pending',
-            storyFile: 'stories/cli/20260107_continue_from_ag_command.story.md',
+            storyFile: 'stories/state-bridge/20260107_session_discovery.story.md',
             dependencies: ['P2-001'],
         },
         {
             id: 'P2-003',
-            agent: 'security-engineer',
-            description: 'Security review of context injection',
+            agent: 'backend-engineer',
+            description: 'Implement SessionParser with version detection',
             status: 'pending',
-            storyFile: 'stories/security/20260107_context_security_review.story.md',
+            storyFile: 'stories/state-bridge/20260107_session_parser.story.md',
             dependencies: ['P2-002'],
         },
         {
             id: 'P2-004',
+            agent: 'backend-engineer',
+            description: 'Implement --ag-session CLI flag',
+            status: 'pending',
+            storyFile: 'stories/cli/20260107_continue_from_ag_command.story.md',
+            dependencies: ['P2-003'],
+        },
+        {
+            id: 'P2-005',
+            agent: 'security-engineer',
+            description: 'Security review of context injection and path traversal',
+            status: 'pending',
+            storyFile: 'stories/security/20260107_context_security_review.story.md',
+            dependencies: ['P2-004'],
+        },
+        {
+            id: 'P2-006',
             agent: 'qa-engineer',
-            description: 'Integration tests for context injection',
+            description: 'Integration tests for state bridge components',
             status: 'pending',
             storyFile: 'stories/qa/20260107_context_integration_tests.story.md',
-            dependencies: ['P2-003'],
+            dependencies: ['P2-005'],
         },
     ];
 
-    await bus.initializePhase('phase-2-context-injection', 'docs/phases/phase-2-context-injection.md', tasks);
+    await bus.initializePhase('phase-2-state-bridge', 'docs/phases/phase-2-context-injection.md', tasks);
 
     console.log('\n✅ Phase 2 initialized in GEMINI.md');
     console.log('Tasks:');

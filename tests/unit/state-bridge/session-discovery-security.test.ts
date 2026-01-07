@@ -19,7 +19,9 @@ describe('SessionDiscovery Security', () => {
 
     it('should reject sessions with path traversal in filenames', async () => {
         // Mock readdir returning a suspicious filename that might try to escape if not handled
-        mockFs.readdirSync.mockReturnValue(['../../etc/passwd' as any]);
+        mockFs.readdirSync.mockReturnValue([
+            { name: '../../etc/passwd', isDirectory: () => false, isFile: () => true }
+        ] as any);
 
         const sessions = await discovery.findSessions();
 
@@ -27,7 +29,9 @@ describe('SessionDiscovery Security', () => {
         // In our implementation, path.join(basePath, file) will be called.
         // SessionDiscovery.findSessions should skip it because it's not .json anyway, 
         // but let's test a .json one that tries to escape.
-        mockFs.readdirSync.mockReturnValue(['../escaped.json' as any]);
+        mockFs.readdirSync.mockReturnValue([
+            { name: '../escaped.json', isDirectory: () => false, isFile: () => true }
+        ] as any);
         mockFs.statSync.mockReturnValue({ mtime: new Date(), size: 100 } as any);
 
         const sessions2 = await discovery.findSessions();
@@ -37,7 +41,9 @@ describe('SessionDiscovery Security', () => {
     it('should only accept sessions within authorized base paths', async () => {
         // This is primarily handled by the searchPaths loop, but we added a check
         // for each file path.
-        mockFs.readdirSync.mockReturnValue(['session-valid.json' as any]);
+        mockFs.readdirSync.mockReturnValue([
+            { name: 'session-valid.json', isDirectory: () => false, isFile: () => true }
+        ] as any);
         mockFs.statSync.mockReturnValue({ mtime: new Date(), size: 100 } as any);
 
         const sessions = await discovery.findSessions();

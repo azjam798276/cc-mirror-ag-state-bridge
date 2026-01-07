@@ -442,7 +442,7 @@ export class ArtifactReader {
 // CLI Runner
 // ============================================================================
 
-async function main() {
+export async function main() {
     console.log('📚 Cross-Agent Artifact Reader\n');
 
     const reader = new ArtifactReader();

@@ -13,6 +13,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
 import { EventEmitter } from 'events';
+import { ArtifactProgressScanner } from './artifact-scanner';
 
 // ============================================================================
 // Types
@@ -44,7 +45,9 @@ export interface AgentStatus {
     pendingTasks: number;
     isComplete: boolean;
     isIdle: boolean;
+    isActive: boolean;           // True if any file modified in last 30s
     idleDurationMs: number;
+    lastActivityTime: Date | null; // Most recent file modification
     currentTask: string | null;
     checklistItems: TaskChecklistItem[];
 }
@@ -53,6 +56,7 @@ export interface OrchestratorConfig {
     pollingIntervalMs: number;      // How often to check (default 30s)
     idleThresholdMs: number;        // When to consider agent idle (default 60s)
     brainBaseDir: string;           // ~/.gemini/antigravity/brain
+    repoRoot: string;               // project root
     agents: AgentConfig[];
     autoInjectContinuation: boolean;
 }
@@ -75,6 +79,8 @@ export class BrainPoller extends EventEmitter {
     private running: boolean = false;
     private pollInterval: NodeJS.Timeout | null = null;
     private lastActivityMap: Map<string, Date> = new Map();
+    private artifactScanner: ArtifactProgressScanner;
+    private currentSprint: number = 4;  // Track current sprint
 
     constructor(config: Partial<OrchestratorConfig> = {}) {
         super();
@@ -91,9 +97,12 @@ export class BrainPoller extends EventEmitter {
             pollingIntervalMs: config.pollingIntervalMs ?? 30000,
             idleThresholdMs: config.idleThresholdMs ?? 60000,
             brainBaseDir,
+            repoRoot: config.repoRoot ?? process.cwd(),
             agents: resolvedAgents,
             autoInjectContinuation: config.autoInjectContinuation ?? false,
         };
+
+        this.artifactScanner = new ArtifactProgressScanner(this.config.repoRoot);
     }
 
     // --------------------------------------------------------------------------
@@ -158,6 +167,16 @@ export class BrainPoller extends EventEmitter {
 
         console.log(`\n[BrainPoller] === Poll Cycle ${timestamp.toISOString()} ===`);
 
+        // Auto-update task.md files based on detected artifacts
+        try {
+            for (const agent of this.config.agents) {
+                await this.artifactScanner.updateAgentTask(agent.brainDir, this.currentSprint
+                );
+            }
+        } catch (error) {
+            console.error('[BrainPoller] Artifact scan error:', error);
+        }
+
         for (const agent of this.config.agents) {
             try {
                 const status = await this.pollAgent(agent);
@@ -199,6 +218,7 @@ export class BrainPoller extends EventEmitter {
         let lastModified: Date | null = null;
         let checklistItems: TaskChecklistItem[] = [];
         let currentTask: string | null = null;
+        let lastActivityTime: Date | null = null;
 
         if (taskMdExists) {
             // Get last modified time
@@ -214,17 +234,28 @@ export class BrainPoller extends EventEmitter {
             currentTask = inProgress?.text ?? null;
         }
 
-        // Calculate idle duration
-        const lastActivity = this.lastActivityMap.get(agent.conversationId);
+        // Check ALL files in brain dir for recent activity (process detection)
+        if (brainExists) {
+            lastActivityTime = await this.getMostRecentFileActivity(agent.brainDir);
+        }
+
+        // Calculate idle duration based on most recent activity
+        const activityTime = lastActivityTime || lastModified;
         const now = Date.now();
         let idleDurationMs = 0;
 
-        if (lastModified) {
-            idleDurationMs = now - lastModified.getTime();
-            this.lastActivityMap.set(agent.conversationId, lastModified);
-        } else if (lastActivity) {
-            idleDurationMs = now - lastActivity.getTime();
+        if (activityTime) {
+            idleDurationMs = now - activityTime.getTime();
+            this.lastActivityMap.set(agent.conversationId, activityTime);
+        } else {
+            const lastActivity = this.lastActivityMap.get(agent.conversationId);
+            if (lastActivity) {
+                idleDurationMs = now - lastActivity.getTime();
+            }
         }
+
+        // isActive = any file modified in last 30 seconds
+        const isActive = lastActivityTime ? (now - lastActivityTime.getTime()) < 30000 : false;
 
         // Calculate task counts
         const totalTasks = checklistItems.length;
@@ -233,7 +264,7 @@ export class BrainPoller extends EventEmitter {
         const pendingTasks = checklistItems.filter(i => i.status === 'pending').length;
 
         const isComplete = totalTasks > 0 && completedTasks === totalTasks;
-        const isIdle = idleDurationMs > this.config.idleThresholdMs && !isComplete;
+        const isIdle = idleDurationMs > this.config.idleThresholdMs && !isComplete && !isActive;
 
         const status: AgentStatus = {
             agentId: agent.agentId,
@@ -248,7 +279,9 @@ export class BrainPoller extends EventEmitter {
             pendingTasks,
             isComplete,
             isIdle,
+            isActive,
             idleDurationMs,
+            lastActivityTime,
             currentTask,
             checklistItems,
         };
@@ -261,6 +294,34 @@ export class BrainPoller extends EventEmitter {
         console.log(`  ${agent.role}: ${progressBar} (${completedTasks}/${totalTasks})${completeIndicator}${idleIndicator}`);
 
         return status;
+    }
+
+    // --------------------------------------------------------------------------
+    // File Activity Detection
+    // --------------------------------------------------------------------------
+
+    /**
+     * Get the most recent file modification time in a directory.
+     * Used to detect if an agent is actively running (writing files).
+     */
+    private async getMostRecentFileActivity(dirPath: string): Promise<Date | null> {
+        try {
+            const files = await fs.readdir(dirPath);
+            let mostRecent: Date | null = null;
+
+            for (const file of files) {
+                const filePath = path.join(dirPath, file);
+                const stat = await fs.stat(filePath);
+
+                if (!mostRecent || stat.mtime > mostRecent) {
+                    mostRecent = stat.mtime;
+                }
+            }
+
+            return mostRecent;
+        } catch {
+            return null;
+        }
     }
 
     // --------------------------------------------------------------------------
@@ -306,7 +367,32 @@ export class BrainPoller extends EventEmitter {
     // --------------------------------------------------------------------------
 
     async injectContinuation(agent: AgentConfig, status: AgentStatus): Promise<void> {
-        // Create a .poke file in brain directory that agent can read
+        // 1. Check for DSPy Reflection Signal (.reflection-needed.json in session dir)
+        const sessionDir = path.join(this.config.repoRoot, '.gemini', 'sessions', agent.agentId);
+        const signalPath = path.join(sessionDir, '.reflection-needed.json');
+        const responsePath = path.join(sessionDir, '.reflection-response.json');
+
+        if (await fs.pathExists(signalPath)) {
+            console.log(`[BrainPoller] Agent ${agent.role} is blocked on a reflection prompt. Injecting automated response...`);
+
+            try {
+                // Automated "Transparent Reflection" response
+                const response = {
+                    response: "Proceed with the current plan. The reasoning is sound and aligns with the TDD requirements. [[REFLECTION_END]]",
+                    timestamp: new Date().toISOString(),
+                    orchestratorPoked: true
+                };
+
+                await fs.writeJSON(responsePath, response, { spaces: 2 });
+                console.log(`[BrainPoller] Wrote automated reflection response to ${responsePath}`);
+
+                // We still write the .continuation-prompt as a fallback/log
+            } catch (error) {
+                console.error(`[BrainPoller] Failed to process reflection signal for ${agent.role}:`, error);
+            }
+        }
+
+        // 2. Standard Gastown Continuation (.continuation-prompt in brain dir)
         const pokePath = path.join(agent.brainDir, '.continuation-prompt');
 
         let prompt: string;

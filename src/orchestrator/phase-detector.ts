@@ -1,27 +1,27 @@
 /**
  * Phase Completion Detector
  * 
- * Monitors all worker agents and triggers Director review when phase is complete.
- * Integrates with:
- * - BrainPoller (agent status monitoring)
- * - GeminiMdMessageBus (shared state)
- * - antigravity-api (continuation injection)
+ * Monitors agent progress and triggers Engineering Director review
+ * when all tasks in a phase are marked complete.
  */
 
-import * as fs from 'fs-extra';
+import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as os from 'os';
-import { EventEmitter } from 'events';
-import BrainPoller, { AgentStatus, AgentConfig } from './brain-poller';
-import GeminiMdMessageBus, { OrchestratorState, TaskDispatch } from './gemini-md-bus';
-import { injectViaFile, ContinuationPrompt } from './antigravity-api';
-
-// ============================================================================
-// Types
-// ============================================================================
+import * as fs from 'fs-extra';
+import {
+    BrainPoller,
+    AgentConfig,
+    AgentStatus,
+    OrchestratorState,
+    ContinuationPrompt,
+    injectViaFile
+} from './index';
+import { GeminiMdMessageBus } from './gemini-md-bus';
 
 export interface PhaseCompletionConfig {
     pollingIntervalMs: number;
+    repoRoot: string;
     directorConversationId: string;
     orchestratorConversationId: string;
     workers: AgentConfig[];
@@ -55,6 +55,7 @@ export class PhaseCompletionDetector extends EventEmitter {
             pollingIntervalMs: config.pollingIntervalMs,
             idleThresholdMs: 60000,
             autoInjectContinuation: true,
+            repoRoot: config.repoRoot,
             agents: config.workers,
         });
 
@@ -62,8 +63,8 @@ export class PhaseCompletionDetector extends EventEmitter {
 
         // Forward events from brain poller
         this.brainPoller.on('agent:complete', (status: AgentStatus) => {
+            this.emit('agent:complete', status);
             this.emit('worker:complete', status);
-            this.checkPhaseCompletion();
         });
     }
 
@@ -142,7 +143,7 @@ export class PhaseCompletionDetector extends EventEmitter {
             this.lastPhaseComplete = false;
 
             // Log progress
-            const progressPct = Math.round((completedTasks / totalTasks) * 100);
+            const progressPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
             console.log(`[PhaseDetector] Phase progress: ${completedTasks}/${totalTasks} (${progressPct}%)`);
         }
     }
@@ -230,8 +231,11 @@ Please review the completed work and issue phase approval/veto JSON:
 async function main() {
     console.log('🔍 Phase Completion Detector\n');
 
+    const repoRoot = path.join(os.homedir(), 'workspace', 'dspy', 'cc-mirror-ag-state-bridge');
+
     const detector = new PhaseCompletionDetector({
         pollingIntervalMs: 30000,
+        repoRoot,
         directorConversationId: '5c053cb6-0934-4f88-9ab9-19aebdecd1a1',
         orchestratorConversationId: 'e20afd38-f5dc-4f4c-aadc-a720cc401eaf',
         workers: [

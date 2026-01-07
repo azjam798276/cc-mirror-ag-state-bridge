@@ -28,7 +28,7 @@ Run COPRO optimization for each role. Target: 5 rollouts, 3 depth iterations.
 
 ### 1.1 Backend Engineer (Already Done ✅)
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill backend-engineer \
   --trainset "stories/state-bridge/*.md" \
   --gemini-binary gemini \
@@ -40,7 +40,7 @@ GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py
 
 ### 1.2 Frontend Engineer
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill frontend-engineer \
   --trainset "stories/cli/*.md" \
   --gemini-binary gemini \
@@ -52,7 +52,7 @@ GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py
 
 ### 1.3 Security Engineer
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill security-engineer \
   --trainset "stories/oauth/*.md" \
   --gemini-binary gemini \
@@ -64,7 +64,7 @@ GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py
 
 ### 1.4 QA Engineer
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill qa-engineer \
   --trainset "stories/state-bridge/*.md" "stories/oauth/*.md" \
   --gemini-binary gemini \
@@ -76,7 +76,7 @@ GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py
 
 ### 1.5 DevOps Engineer
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill devops-engineer \
   --trainset "stories/cli/*.md" \
   --gemini-binary gemini \
@@ -88,7 +88,7 @@ GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py
 
 ### 1.6 Product Manager
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill product-manager \
   --trainset "stories/state-bridge/*.md" "stories/cli/*.md" \
   --gemini-binary gemini \
@@ -150,7 +150,7 @@ story: "session_discovery"
 ### 3.2 Run Bootstrap Optimization
 
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill {ROLE_NAME} \
   --trainset "stories/{category}/*.md" \
   --gemini-binary gemini \
@@ -181,7 +181,7 @@ cat .dspy_cache/trace_logs/rollout_*.json | jq '.feedback'
 If bootstrap didn't help, try semantic matching:
 
 ```bash
-GEMINI_MODEL=gemini-3-flash-preview ../.venv/bin/python ../optimizer/optimize.py \
+GEMINI_MODEL=gemini-2.5-flash ../.venv/bin/python ../optimizer/optimize.py \
   --skill {ROLE_NAME} \
   --trainset "stories/{category}/*.md" \
   --gemini-binary gemini \

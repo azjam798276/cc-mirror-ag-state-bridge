@@ -19,8 +19,14 @@ export class SessionParser {
     }
 
     async parse(filePath: string): Promise<ParsedSession> {
-        // Check file size
         const stats = fs.statSync(filePath);
+
+        // Handle brain directory format (Antigravity IDE)
+        if (stats.isDirectory()) {
+            return this.parseBrainDirectory(filePath);
+        }
+
+        // Check file size for JSON files
         if (stats.size > MAX_FILE_SIZE) {
             throw new SessionParseError(`File exceeds 50MB limit: ${stats.size} bytes`, filePath);
         }
@@ -44,6 +50,88 @@ export class SessionParser {
         // Should never reach here since GenericFormatDetector always returns true
         throw new SessionParseError('No format detector could parse the session', filePath);
     }
+
+    /**
+     * Parse Antigravity brain directory format
+     * Reads task.md and optionally implementation_plan.md
+     */
+    private parseBrainDirectory(dirPath: string): ParsedSession {
+        const sessionId = require('path').basename(dirPath);
+        const taskPath = require('path').join(dirPath, 'task.md');
+        const planPath = require('path').join(dirPath, 'implementation_plan.md');
+
+        let goal = 'Unknown goal';
+        const planSteps: PlanStep[] = [];
+        const completedSteps: PlanStep[] = [];
+        const pendingSteps: PlanStep[] = [];
+        const filesModified: string[] = [];
+
+        // Parse task.md for checklist items
+        if (fs.existsSync(taskPath)) {
+            const taskContent = fs.readFileSync(taskPath, 'utf-8');
+            const lines = taskContent.split('\n');
+
+            // Extract goal from first heading or description
+            const headerMatch = taskContent.match(/^#\s+(.+)/m);
+            if (headerMatch) {
+                goal = headerMatch[1].replace(/Task:\s*/i, '');
+            }
+
+            // Parse checklist items
+            for (const line of lines) {
+                const checkMatch = line.match(/^[-*]\s*\[([ x\/])\]\s*(.+)/);
+                if (checkMatch) {
+                    const status = checkMatch[1] === 'x' ? 'completed' :
+                        checkMatch[1] === '/' ? 'executing' : 'pending';
+                    const step: PlanStep = {
+                        id: `step-${planSteps.length + 1}`,
+                        action: checkMatch[2].trim(),
+                        status,
+                        artifacts: []
+                    };
+                    planSteps.push(step);
+                    if (status === 'completed') {
+                        completedSteps.push(step);
+                    } else {
+                        pendingSteps.push(step);
+                    }
+                }
+            }
+        }
+
+        // Optionally parse implementation_plan.md for more context
+        if (fs.existsSync(planPath)) {
+            const planContent = fs.readFileSync(planPath, 'utf-8');
+
+            // Extract goal from plan if task.md didn't have one
+            if (goal === 'Unknown goal') {
+                const goalMatch = planContent.match(/^#\s+(.+)/m);
+                if (goalMatch) {
+                    goal = goalMatch[1];
+                }
+            }
+
+            // Extract file paths mentioned in the plan
+            const fileMatches = planContent.matchAll(/`([^`]+\.[a-z]{2,4})`/g);
+            for (const match of fileMatches) {
+                if (!filesModified.includes(match[1])) {
+                    filesModified.push(match[1]);
+                }
+            }
+        }
+
+        return {
+            sessionId,
+            goal,
+            planSteps,
+            currentStep: completedSteps.length,
+            completedSteps,
+            pendingSteps,
+            filesModified,
+            variables: {}
+        };
+    }
+
 
     registerFormat(detector: FormatDetector): void {
         // Insert before generic detector
