@@ -882,6 +882,16 @@ Content-Type: application/json
 > ✅ **VALIDATED:** Response schema confirmed via S6-000 PoC (590ms latency).
 > **Key Finding:** Project ID is in `cloudaicompanionProject` field (not `projectId`).
 
+#### ⚠️ Still Open (requires further investigation)
+
+| Question | Impact | Investigation Plan |
+|----------|--------|-------------------|
+| What is the rate limit for `/v1internal:loadCodeAssist`? | Medium | S6-001: Burst test (100 calls in 1 minute) |
+| Do project IDs ever change? | Low | S6-002: Monitor same account over 7 days |
+| What happens if `gcpManaged: true`? | Low | S6-003: Test with Google Workspace account |
+| Are there other tier IDs besides `standard-tier` and `free-tier`? | Low | Document as encountered |
+| What is the optimal cache TTL? | Medium | Current: 1 hour (conservative), test 24 hours |
+
 #### Error Responses (observed)
 
 ```json
