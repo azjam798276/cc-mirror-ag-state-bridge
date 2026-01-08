@@ -864,20 +864,23 @@ Content-Type: application/json
 {}
 ```
 
-**Response (observed via PoC):**
+**Response (observed via PoC - VALIDATED 2026-01-08):**
 ```json
 {
-  "projectId": "cloudful-back-03mg",
-  "quotaRemaining": 10000,  // ASSUMPTION: needs validation in S6-000
-  "features": {              // ASSUMPTION: needs validation
-    "gemini3Pro": true,
-    "claudeOpus": true
-  }
+  "cloudaicompanionProject": "vertical-ability-f3lbr",
+  "currentTier": {
+    "id": "standard-tier",
+    "name": "Gemini Code Assist",
+    "description": "Unlimited coding assistant with the most powerful Gemini models",
+    "userDefinedCloudaicompanionProject": true
+  },
+  "allowedTiers": [...],
+  "gcpManaged": false
 }
 ```
 
-> ⚠️ **ASSUMPTION MARKER:** Response schema is reverse-engineered from opencode-antigravity-auth source.  
-> **Validation:** S6-000 PoC will capture actual responses and update this section in ADD v0.2.
+> ✅ **VALIDATED:** Response schema confirmed via S6-000 PoC (590ms latency).
+> **Key Finding:** Project ID is in `cloudaicompanionProject` field (not `projectId`).
 
 #### Error Responses (observed)
 
